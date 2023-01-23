@@ -8,7 +8,7 @@ import sys
 import asyncio
 import signal
 import socket
-from modules.packet_capturer_simple import PacketCapturer
+from modules.packet_capturer import PacketCapturer
 from modules.window_manager import WindowManager
 from modules.feature_extractor import FeatureExtractor
 from modules.encoding_manager import EncodingManager
