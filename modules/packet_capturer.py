@@ -124,14 +124,14 @@ async def capturer(pcap):
 
 
     # Read the PCAP file
-    packets_captured = iter(rdpcap(pcap.core.training_set_name))
+    packets_captured = rdpcap(pcap.core.training_set_name)
 
     #set_attack_time(self, elname)
     #parse_config(self, conf)
 
-    #for i, packet in enumerate(packets_captured):
-    while pcap.running:
-        packet = next(packets_captured)
+    for i, packet in enumerate(packets_captured):
+    #while pcap.running:
+        #packet = next(packets_captured)
         packet = bytes(packet)
         #pbuf = pcap_next(pcap.handle, ctypes.byref(hbuf))
         pcap.num += 1
