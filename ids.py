@@ -8,7 +8,7 @@ import sys
 import asyncio
 import signal
 import socket
-from modules.packet_capturer import PacketCapturer
+from modules.packet_capturer_simple import PacketCapturer
 from modules.window_manager import WindowManager
 from modules.feature_extractor import FeatureExtractor
 from modules.encoding_manager import EncodingManager
@@ -139,12 +139,12 @@ class IDSCore:
     def run(self):
         logging.info("Training a model by running TCPReplay with {}".format(self.training_set_name))
         self.is_training = True
-
+        
         if self.local:
             cmd = ["tcpreplay", "-i", "lo", self.training_set_name]
             self.tcpreplay_start_for_training = True
             subprocess.call(cmd)
-        else:
+        '''else:
             for i in range(2):
                 msg = "training:{}:{}:{}".format(i, self.sidx, int(time.time()) + 10).encode()
                 self.sock.sendto(msg, (self.ipaddr[i], self.ports[i]))
@@ -183,7 +183,7 @@ class IDSCore:
 
             if done != "done":
                 logging.error("Error: the packet generator are incorrectly quitted")
-                sys.exit(1)
+                sys.exit(1)'''
 
         logging.info("Training packets have been sent")
 
@@ -525,9 +525,9 @@ class IDSCore:
         return self.retest_start_time
 
     def check_queue_lengths(self):
-        logging.debug("packet_capturer: {}".format(self.packet_capturer.get_queue_length()))
-        logging.debug("window_manager: {}".format(self.window_manager.get_queue_length()))
-        logging.debug("feature_extractor: {}".format(self.feature_extractor.get_queue_length()))
+        logging.info("packet_capturer: {}".format(self.packet_capturer.get_queue_length()))
+        logging.info("window_manager: {}".format(self.window_manager.get_queue_length()))
+        logging.info("feature_extractor: {}".format(self.feature_extractor.get_queue_length()))
         logging.info("model_manager: {}".format(self.model_manager.get_queue_length()))
         return self.packet_capturer.get_queue_length() == 0 and self.window_manager.get_queue_length() == 0 and self.feature_extractor.get_queue_length() == 0 and self.model_manager.get_queue_length() == 0
 
@@ -568,15 +568,19 @@ class IDSCore:
         return self.attack_end_time
 
     def send_packet_to_window_manager(self, pkt):
+        #print("1 send_packet_to_window_manager")
         self.window_manager.add_packet(pkt)
 
     def send_window_to_feature_extractor(self, window):
+        #print("2 send_window_to_feature_extractor")
         self.feature_extractor.add_window(window)
 
     def send_window_to_encoding_manager(self, window):
+        #print("3 send_window_to_encoding_manager")
         self.encoding_manager.add_window(window)
 
     def send_window_to_model_manager(self, window):
+        #print("4 send_window_to_model_manager")
         self.model_manager.add_window(window)
 
     def send_identified_infections_to_model_manager(self, serials):
@@ -617,7 +621,6 @@ def parse_config(ids, conf):
     port0 = 20001
     port1 = 20001
     strategy = 1
-    slength = 1000
 
     with open(conf, "r") as f:
         for line in f:
@@ -695,8 +698,6 @@ def parse_config(ids, conf):
                     efname = val
                 elif key == "Update Strategy":
                     strategy = val
-                elif key == "Sequence Length":
-                    slength = int(val)
                 elif key == "Encoder":
                     ename = val
                 elif key == "Attack Detection":
