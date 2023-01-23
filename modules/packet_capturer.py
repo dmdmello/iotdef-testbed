@@ -6,7 +6,6 @@ import dpkt
 import threading
 import sys
 import time
-import pcapy
 import asyncio
 import socket
 import ctypes
@@ -15,6 +14,10 @@ sys.path.append("..")
 from definitions.packet import Packet
 from utils.network import extract_flow_info
 from ctypes.util import find_library
+
+
+from scapy.all import Ether, rdpcap
+
 
 usleep = lambda x: time.sleep(x/1000000.0)
 THREAD_USLEEP_TIME=0.1
@@ -31,26 +34,6 @@ class pcap_pkthdr(ctypes.Structure):
             ("caplen", ctypes.c_uint), 
             ("len", ctypes.c_uint)]
 
-libpcap = ctypes.cdll.LoadLibrary(find_library("pcap"))
-
-pcap_open_live = libpcap.pcap_open_live
-pcap_open_live.restype = ctypes.POINTER(ctypes.c_void_p)
-
-pcap_can_set_rfmon = libpcap.pcap_can_set_rfmon
-pcap_can_set_rfmon.argtypes = [ctypes.c_void_p]
-
-pcap_next = libpcap.pcap_next
-pcap_next.restype = ctypes.POINTER(ctypes.c_char)
-pcap_next.argtypes = [ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(pcap_pkthdr)]
-
-pcap_next_ex = libpcap.pcap_next_ex
-pcap_next_ex.restype = ctypes.c_int
-
-dev = bytes(str('lo'), 'ascii')
-snaplen = ctypes.c_int(2048)
-promisc = ctypes.c_int(1)
-to_ms = ctypes.c_int(0)
-errbuf = ctypes.create_string_buffer(PCAP_ERRBUF_SIZE)
 
 class PacketCapturer:
     def __init__(self, core, training_label=None, test_label=None):
@@ -58,7 +41,7 @@ class PacketCapturer:
         self.training_label = training_label
         self.test_label = test_label
         self.labels = 0
-        self.handle = pcap_open_live(dev, snaplen, promisc, to_ms, errbuf)
+        #self.handle = pcap_open_live(dev, snaplen, promisc, to_ms, errbuf)
         self.training_start_time = None
         self.test_start_time = None 
         self.running = True
@@ -84,7 +67,7 @@ class PacketCapturer:
 async def pp(pcap, num, header, packet):
     ts = time.time()
 #    num, header, packet = pcap.queue.pop(0)
-#    logging.info("Packet Number: {}".format(num))
+#    logging.info("PACKET:Packet Number: {}".format(num))
 
     pkt = parse_packet(ts, header, packet)
     if pkt:
@@ -97,7 +80,7 @@ async def pp(pcap, num, header, packet):
                 #pcap.cnt = await check_label(pkt, pcap.cnt, pcap.training_label)
                 pcap.cnt += 1
                 if pcap.cnt % 1000 == 0:
-                    logging.info("cnt: {}, key: {}, label: {}, queue: {}".format(pcap.cnt, pkt.get_flow_info(), pkt.get_label(), len(pcap.queue)))
+                    logging.info("PACKET:cnt: {}, key: {}, label: {}, queue: {}".format(pcap.cnt, pkt.get_flow_info(), pkt.get_label(), len(pcap.queue)))
             elif pcap.core.get_tcpreplay_start_for_testing() and not pcap.core.get_tcpreplay_end_for_testing():
                 if not pcap.core.get_test_start_time():
                     pcap.num = 1
@@ -107,7 +90,7 @@ async def pp(pcap, num, header, packet):
                 #pcap.cnt = await check_label(pkt, pcap.cnt, pcap.test_label)
                 pcap.cnt += 1
                 if pcap.cnt % 1000 == 0:
-                    logging.info("cnt: {}, key: {}, label: {}, queue: {}".format(pcap.cnt, pkt.get_flow_info(), pkt.get_label(), len(pcap.queue)))
+                    logging.info("PACKET:cnt: {}, key: {}, label: {}, queue: {}".format(pcap.cnt, pkt.get_flow_info(), pkt.get_label(), len(pcap.queue)))
 
             elif pcap.core.get_tcpreplay_start_for_retesting() and not pcap.core.get_tcpreplay_end_for_retesting():
                 if not pcap.core.get_retest_start_time():
@@ -118,7 +101,7 @@ async def pp(pcap, num, header, packet):
                 #pcap.cnt = await check_label(pkt, pcap.cnt, pcap.test_label)
                 pcap.cnt += 1
                 if pcap.cnt % 1000 == 0:
-                    logging.info("cnt: {}, key: {}, label: {}, queue: {}".format(pcap.cnt, pkt.get_flow_info(), pkt.get_label(), len(pcap.queue)))
+                    logging.info("PACKET:cnt: {}, key: {}, label: {}, queue: {}".format(pcap.cnt, pkt.get_flow_info(), pkt.get_label(), len(pcap.queue)))
 
             if pcap.core.get_tcpreplay_start_for_testing() and pcap.core.get_attack_start_time() == None and pkt.get_label() == 1:
                 logging.debug(">>> Attack Start Time: {}".format(ts))
@@ -135,23 +118,35 @@ async def pp(pcap, num, header, packet):
         pcap.cnt += 1
 
 async def capturer(pcap):
-    logging.info("Run Packet Capturer")
+    logging.info("PACKET:Run Packet Capturer")
     num = 0
     hbuf = pcap_pkthdr()
 
+
+    # Read the PCAP file
+    packets_captured = iter(rdpcap(pcap.core.training_set_name))
+
+    #set_attack_time(self, elname)
+    #parse_config(self, conf)
+
+    #for i, packet in enumerate(packets_captured):
     while pcap.running:
-        pbuf = pcap_next(pcap.handle, ctypes.byref(hbuf))
+        packet = next(packets_captured)
+        packet = bytes(packet)
+        #pbuf = pcap_next(pcap.handle, ctypes.byref(hbuf))
         pcap.num += 1
         header = pcap_pkthdr()
         header.len = hbuf.len
         header.caplen = hbuf.caplen
         header.ts.tv_sec = hbuf.ts.tv_sec
         header.ts.tv_usec = hbuf.ts.tv_usec
-        packet = pbuf[:header.len]
-        logging.debug("Packet capturered: {} ({} bytes)".format(pcap.num, header.len))
-#        pcap.queue.append((num, header, packet))
+        #packet = pbuf[:header.len]
+        #time.sleep(2)
+        #logging.info("PACKET:Packet capturered: {} ({} bytes)".format(pcap.num, header.len))
+        #logging.info("PACKET:Packet capturered: {}".format(pcap.num))
+        #pcap.queue.append((num, header, packet))
         await pp(pcap, pcap.num, header, packet)
-    logging.info("Quit Packet Capturer")
+    logging.info("PACKET:Quit Packet Capturer")
 
 def run(pcap, loop):
     asyncio.set_event_loop(loop)
