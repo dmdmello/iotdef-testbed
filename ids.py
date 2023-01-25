@@ -139,12 +139,13 @@ class IDSCore:
     def run(self):
         logging.info("Training a model by running TCPReplay with {}".format(self.training_set_name))
         self.is_training = True
-        
-        if self.local:
+        self.tcpreplay_start_for_training = True
+        self.set_training_start_time(time.time()) 
+        '''if self.local:
             cmd = ["tcpreplay", "-i", "lo", self.training_set_name]
             self.tcpreplay_start_for_training = True
             subprocess.call(cmd)
-        '''else:
+        else:
             for i in range(2):
                 msg = "training:{}:{}:{}".format(i, self.sidx, int(time.time()) + 10).encode()
                 self.sock.sendto(msg, (self.ipaddr[i], self.ports[i]))
@@ -196,6 +197,8 @@ class IDSCore:
         while not self.is_training_set_processed:
             time.sleep(1)
             curr = time.time()
+            print('cond 2, curr {}, start {}, total time {}, window perior {}, offset {}'.format(
+                curr, self.training_start_time, self.training_set_info["Total Time"], self.window_manager.get_period(), OFFSET))
             if self.check_queue_lengths() and curr > self.training_start_time + self.training_set_info["Total Time"] + self.window_manager.get_period() + OFFSET:
                 self.is_training_set_processed = True
 
